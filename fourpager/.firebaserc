@@ -1,0 +1,14 @@
+{
+  "projects": {
+    "default": "stelath-website"
+  },
+  "targets": {
+    "stelath-website": {
+      "hosting": {
+        "fourpager": [
+          "fourpager"
+        ]
+      }
+    }
+  }
+}
