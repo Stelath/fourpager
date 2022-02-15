@@ -3,6 +3,8 @@ import { styled } from '@mui/material/styles';
 import LinearProgress from '@mui/material/LinearProgress';
 import { Button, Box } from '@material-ui/core';
 import { PDFDocument, PageSizes } from 'pdf-lib'
+import FileSaver, { saveAs } from 'file-saver';
+import JSZip from 'jszip';
 
 import './assets/css/App.css';
 
@@ -13,46 +15,34 @@ function App() {
   const [progressValue, setProgressValue] = useState(0);
 
   const [filename, setFilename] = useState('');
-  const [pdf, setPdf] = useState(null);
+  const [file, setFile] = useState(null);
 
   const reformatPDF = async (originalPdfBytes) => {
     originalPdfBytes = Uint8Array.from(originalPdfBytes);
-    
-    const pdfDoc = await PDFDocument.create();
-  
     const originalPdf = await PDFDocument.load(originalPdfBytes);
-    const pages = originalPdf.getPages();
-  
-    const embeddedPages = await pdfDoc.embedPages(pages);
-    const pageDims = embeddedPages.map(embeddedPage => (
-      embeddedPage.scale(0.4704)
-    ));
-
-    setProgressValue(25);
+    const originalPages = originalPdf.getPages();
     
-    var newPages = []
-    for (var i = 0; i < pages.length; i++) {
-      if (i % 4 === 0) {
-        newPages.push(pdfDoc.addPage(PageSizes.Letter));
-      }
-    }
-
-    setProgressValue(60);
-  
-    embeddedPages.forEach((embeddedPage, i) => {
-      const page = newPages[Math.floor(i / 4)]
-      page.drawPage(embeddedPage, {
-        ...pageDims[i],
-        x: (i % 2 === 0) ? 15.18 : 308.939,
-        y: (Math.floor((i % 4) / 2) === 0) ? 401.601 : 17.84,
+    var pdfDocs = [];
+    
+    for (var i = 0; i < originalPages.length; i+=4) {
+      const pdfDoc = await PDFDocument.create();
+      const copiedPages = await pdfDoc.copyPages(originalPdf, [...Array(originalPages.length).keys()].slice(i, i+4));
+      copiedPages.forEach((copiedPage) => {
+        pdfDoc.addPage(copiedPage);
       });
+      const pdfBytes = await pdfDoc.save()
+
+      pdfDocs.push(pdfBytes);
+      setProgressValue(i/originalPages.length*100*0.75);
+    }
+    
+    // creating archives
+    var zip = new JSZip();
+    
+    pdfDocs.forEach((pdfDoc, idx) => {
+      zip.file(`${filename}_${idx * 4 + 1}-${idx * 4 + 4}.pdf`, pdfDoc);
     });
-    setProgressValue(90);
-  
-    const pdfBytes = await pdfDoc.save()
-  
-    var blob = new Blob([pdfBytes], { type: 'application/pdf' });
-    setPdf(blob);
+    setFile(zip);
 
     setProgressValue(100);
     setDownloadAvailable(true);
@@ -76,12 +66,9 @@ function App() {
   };
   
   const onDownloadButtonClicked = () => {
-    var tempLink = document.createElement('a');
-    var csvURL = window.URL.createObjectURL(pdf);
-    tempLink = document.createElement('a');
-    tempLink.href = csvURL;
-    tempLink.setAttribute('download', (filename + ' Formatted.pdf'));
-    tempLink.click();
+    file.generateAsync({type:"blob"}).then(function(content) {
+      saveAs(content, filename + '.zip');
+    });
   }
   
   const Input = styled('input')({
