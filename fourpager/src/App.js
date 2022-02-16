@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { styled } from '@mui/material/styles';
 import LinearProgress from '@mui/material/LinearProgress';
 import { Button, Box } from '@material-ui/core';
@@ -14,8 +14,8 @@ function App() {
   const [downloadAvailable, setDownloadAvailable] = useState(false);
   const [progressValue, setProgressValue] = useState(0);
 
-  const [filename, setFilename] = useState('');
   const [file, setFile] = useState(null);
+  const [fileData, setFileData] = useState(null);
 
   const reformatPDF = async (originalPdfBytes) => {
     originalPdfBytes = Uint8Array.from(originalPdfBytes);
@@ -38,9 +38,8 @@ function App() {
     
     // creating archives
     var zip = new JSZip();
-    
     pdfDocs.forEach((pdfDoc, idx) => {
-      zip.file(`${filename}_${idx * 4 + 1}-${idx * 4 + 4}.pdf`, pdfDoc);
+      zip.file(`${fileData['fileName']}_${idx * 4 + 1}-${(idx * 4 + 4 > originalPages.length) ? originalPages.length : idx * 4 + 4}.pdf`, pdfDoc);
     });
     setFile(zip);
 
@@ -52,7 +51,6 @@ function App() {
     var reader = new FileReader();
     var fileByteArray = [];
     reader.readAsArrayBuffer(event.target.files[0]);
-    setFilename(event.target.files[0].name.split('.')[0]);
     reader.onloadend = (evt) => {
         if (evt.target.readyState === FileReader.DONE) {
           var arrayBuffer = evt.target.result,
@@ -60,14 +58,20 @@ function App() {
           for (var i = 0; i < array.length; i++) {
               fileByteArray.push(array[i]);
           }
-          reformatPDF(fileByteArray);
+          setFileData({'fileName' : event.target.files[0].name.split('.')[0], 'fileByteArray' : fileByteArray});
         }
     }
   };
+
+  useEffect(() => {
+    if (fileData != null) {
+      reformatPDF(fileData['fileByteArray']);
+    }
+  }, [fileData]);
   
   const onDownloadButtonClicked = () => {
     file.generateAsync({type:"blob"}).then(function(content) {
-      saveAs(content, filename + '.zip');
+      saveAs(content, fileData['fileName'] + '.zip');
     });
   }
   
